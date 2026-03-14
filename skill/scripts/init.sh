@@ -17,6 +17,23 @@ TEMPLATES_DIR="${SKILL_DIR}/templates"
 DATE=$(date '+%Y-%m-%d')
 PROJECTS_ROOT="${HOME}/Projects"
 
+# ── Load .env if exists (never read by agent, only by script) ──
+ENV_FILE="${SKILL_DIR}/.env"
+if [ -f "${ENV_FILE}" ]; then
+  set -a
+  source "${ENV_FILE}"
+  set +a
+fi
+# Also check local .env
+if [ -f "${PWD}/.env" ]; then
+  set -a
+  source "${PWD}/.env"
+  set +a
+fi
+
+# Apply env overrides
+[ -n "${PROJECTOR_HUB_DIR:-}" ] && PROJECTS_ROOT="$(dirname "${PROJECTOR_HUB_DIR}")"
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -67,7 +84,23 @@ validate_github_org() {
   log "Validando organización '${BOLD}${ORG_NAME}${NC}' en GitHub..."
   if ! gh api "orgs/${ORG_NAME}" --silent 2>/dev/null; then
     error "La organización '${ORG_NAME}' no existe en GitHub."
-    error "Créala en: ${CYAN}https://github.com/organizations/plan${NC}"
+    echo ""
+    echo -e "  ${BOLD}¿Cómo crear una organización en GitHub?${NC}"
+    echo ""
+    echo -e "  ${CYAN}1.${NC} Ve a ${CYAN}https://github.com/organizations/plan${NC}"
+    echo -e "  ${CYAN}2.${NC} Selecciona el plan ${BOLD}Free${NC} (o el que prefieras)"
+    echo -e "  ${CYAN}3.${NC} Nombre de la organización: ${BOLD}${ORG_NAME}${NC}"
+    echo -e "  ${CYAN}4.${NC} Email de contacto: tu email"
+    echo -e "  ${CYAN}5.${NC} Selecciona '${BOLD}My personal account${NC}' como propietario"
+    echo -e "  ${CYAN}6.${NC} Completa la verificación y crea la organización"
+    echo ""
+    echo -e "  ${DIM}Una vez creada, configura tu .env:${NC}"
+    echo -e "  ${CYAN}cp .env.example .env${NC}"
+    echo -e "  ${DIM}Agrega: ${CYAN}PROJECTOR_ORG=${ORG_NAME}${NC}"
+    echo ""
+    echo -e "  ${DIM}Luego vuelve a ejecutar:${NC}"
+    echo -e "  ${CYAN}bash init.sh --hub ${ORG_NAME}${NC}"
+    echo ""
     return 1
   fi
   success "Organización '${ORG_NAME}' encontrada"
@@ -125,10 +158,18 @@ interactive_setup() {
 # ── Guided Hub Setup ──
 guided_hub() {
   # Step 2: Org name
+  # Pre-fill from .env if available
+  local DEFAULT_ORG="${PROJECTOR_ORG:-}"
+
   echo -e "${BOLD}¿Cuál es el nombre de la organización en GitHub?${NC}"
   echo -e "  ${DIM}(ejemplo: condolab-app, mi-empresa, etc.)${NC}"
-  read -r -p "$(echo -e "  Organización: ${CYAN}")" ORG_NAME
-  echo -ne "${NC}"
+  if [ -n "${DEFAULT_ORG}" ]; then
+    read -r -p "$(echo -e "  Organización [${CYAN}${DEFAULT_ORG}${NC}]: ")" ORG_NAME
+    ORG_NAME="${ORG_NAME:-${DEFAULT_ORG}}"
+  else
+    read -r -p "$(echo -e "  Organización: ${CYAN}")" ORG_NAME
+    echo -ne "${NC}"
+  fi
   echo ""
 
   if [ -z "${ORG_NAME}" ]; then

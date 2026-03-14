@@ -65,6 +65,28 @@ open_browser() {
   success "Abierto en el navegador"
 }
 
+# ── Sync content.js from .md ──
+sync_content_js() {
+  local MD_FILE="$1"
+  local DIR=$(dirname "$MD_FILE")
+  local CONTENT_JS="${DIR}/content.js"
+  if [ ! -f "$MD_FILE" ]; then
+    error "No se encontró: $MD_FILE"
+    return 1
+  fi
+  python3 - "$MD_FILE" "$CONTENT_JS" << 'PYEOF'
+import sys
+md_path, js_path = sys.argv[1], sys.argv[2]
+with open(md_path, 'r') as f:
+    md = f.read()
+# Escape for JS template literal
+md = md.replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')
+with open(js_path, 'w') as f:
+    f.write('window.__MD_CONTENT = `' + md + '`;\n')
+PYEOF
+  success "content.js sincronizado: ${CONTENT_JS}"
+}
+
 # ── Validate GitHub org ──
 validate_github_org() {
   local ORG_NAME="$1"
@@ -331,30 +353,28 @@ create_hub_project_with_dir() {
 
   mkdir -p "${PROJECT_DIR}"
 
-  if [ ! -f "${PROJECT_DIR}/technical-design.html" ]; then
-    cp "${TEMPLATES_DIR}/technical-design.html" "${PROJECT_DIR}/technical-design.html"
+  if [ ! -f "${PROJECT_DIR}/technical-design.md" ]; then
+    # Copy Markdown template (source of truth)
+    cp "${TEMPLATES_DIR}/technical-design.md" "${PROJECT_DIR}/technical-design.md"
+    # Copy viewer
+    cp "${TEMPLATES_DIR}/viewer.html" "${PROJECT_DIR}/index.html"
 
-    # Also create Markdown version (visible on GitHub)
-    if [ -f "${TEMPLATES_DIR}/technical-design.md" ]; then
-      cp "${TEMPLATES_DIR}/technical-design.md" "${PROJECT_DIR}/technical-design.md"
+    # Replace placeholders in .md
+    local f="${PROJECT_DIR}/technical-design.md"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      sed -i '' "s/{{PROJECT_NAME}}/${PROJECT_NAME}/g" "$f"
+      sed -i '' "s/{{PROJECT_DESCRIPTION}}/${PROJECT_DESC}/g" "$f"
+      sed -i '' "s/{{DATE}}/${DATE}/g" "$f"
+    else
+      sed -i "s/{{PROJECT_NAME}}/${PROJECT_NAME}/g" "$f"
+      sed -i "s/{{PROJECT_DESCRIPTION}}/${PROJECT_DESC}/g" "$f"
+      sed -i "s/{{DATE}}/${DATE}/g" "$f"
     fi
 
-    # Replace placeholders in both files
-    for ext in html md; do
-      local f="${PROJECT_DIR}/technical-design.${ext}"
-      [ -f "$f" ] || continue
-      if [[ "$OSTYPE" == "darwin"* ]]; then
-        sed -i '' "s/{{PROJECT_NAME}}/${PROJECT_NAME}/g" "$f"
-        sed -i '' "s/{{PROJECT_DESCRIPTION}}/${PROJECT_DESC}/g" "$f"
-        sed -i '' "s/{{DATE}}/${DATE}/g" "$f"
-      else
-        sed -i "s/{{PROJECT_NAME}}/${PROJECT_NAME}/g" "$f"
-        sed -i "s/{{PROJECT_DESCRIPTION}}/${PROJECT_DESC}/g" "$f"
-        sed -i "s/{{DATE}}/${DATE}/g" "$f"
-      fi
-    done
+    # Generate content.js from .md
+    sync_content_js "${PROJECT_DIR}/technical-design.md"
 
-    success "Documentos creados: technical-design.html + technical-design.md"
+    success "Proyecto creado: ${PROJECT_DIR}/"
 
     # Update metadata.js
     local META="${HUB_DIR}/metadata.js"
@@ -372,7 +392,7 @@ PYEOF
       success "Metadata actualizado"
     fi
 
-    open_browser "${PROJECT_DIR}/technical-design.html"
+    open_browser "${PROJECT_DIR}/index.html"
   else
     log "El proyecto '${PROJECT_NAME}' ya existe"
   fi
@@ -402,14 +422,12 @@ init_standalone_core() {
 
   mkdir -p "${TARGET_DIR}"
 
-  if [ ! -f "${TARGET_DIR}/technical-design.html" ]; then
-    cp "${TEMPLATES_DIR}/technical-design.html" "${TARGET_DIR}/technical-design.html"
-    # Also create Markdown version
-    if [ -f "${TEMPLATES_DIR}/technical-design.md" ]; then
-      cp "${TEMPLATES_DIR}/technical-design.md" "${TARGET_DIR}/technical-design.md"
-    fi
-    success "Templates copiados: .html + .md"
-    open_browser "${TARGET_DIR}/technical-design.html"
+  if [ ! -f "${TARGET_DIR}/technical-design.md" ]; then
+    cp "${TEMPLATES_DIR}/technical-design.md" "${TARGET_DIR}/technical-design.md"
+    cp "${TEMPLATES_DIR}/viewer.html" "${TARGET_DIR}/index.html"
+    sync_content_js "${TARGET_DIR}/technical-design.md"
+    success "Projector inicializado: .md + viewer"
+    open_browser "${TARGET_DIR}/index.html"
   else
     log "Documento técnico ya existe, no se sobreescribe"
   fi
@@ -436,6 +454,16 @@ case "${1:-}" in
     else
       init_hub "$2"
     fi
+    ;;
+  --sync)
+    if [ -z "${2:-}" ]; then
+      error "Debes especificar la ruta al archivo .md"
+      echo ""
+      echo -e "  Uso: ${CYAN}bash init.sh --sync <ruta/technical-design.md>${NC}"
+      echo ""
+      exit 1
+    fi
+    sync_content_js "$2"
     ;;
   --standalone)
     init_standalone_core

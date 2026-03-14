@@ -84,7 +84,15 @@ Ejemplo:
 [Contenido real generado]
 ```
 
-### 3.4 Confirmar y avanzar
+### 3.4 Sincronizar visor
+Después de cada edición al `.md`, regenera `content.js` para que el visor refleje los cambios:
+```bash
+# Ejecuta con run_command (SafeToAutoRun=true, es seguro)
+bash ~/.gemini/antigravity/skills/software-design/scripts/init.sh --sync <ruta-al-technical-design.md>
+```
+> O si tienes python3 disponible, puedes generar content.js directamente inline.
+
+### 3.5 Confirmar y avanzar
 Pregunta al usuario si desea ajustar algo o avanzar a la siguiente fase.
 
 ## Paso 4: Finalización

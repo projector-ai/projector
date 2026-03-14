@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projector — Visor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <style>
+        :root {
+            --bg-page: #0a0a0f;
+            --bg-sidebar: #111118;
+            --bg-hover: #1a1a28;
+            --bg-active: #252536;
+            --bg-card: #141420;
+            --bg-code: #161624;
+            --bg-popup: #1a1a28;
+            --border: #222236;
+            --border-hover: #333350;
+            --text-primary: #e8e8f0;
+            --text-secondary: #8a8a9a;
+            --text-muted: #55556a;
+            --accent: #6c5ce7;
+            --accent-light: #a29bfe;
+            --accent-bg: rgba(108, 92, 231, 0.12);
+            --success: #00d2a0;
+            --success-bg: rgba(0, 210, 160, 0.1);
+            --warning: #ffa726;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+            --radius: 10px;
+            --sidebar-w: 260px;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            --transition: 150ms ease;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            font-size: 16px;
+            scroll-behavior: smooth;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg-page);
+            color: var(--text-primary);
+            line-height: 1.8;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* ── SIDEBAR ── */
+        .sidebar {
+            width: var(--sidebar-w);
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border);
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            overflow-y: auto;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px 16px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-back {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-decoration: none;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .sidebar-back:hover {
+            color: var(--accent-light);
+        }
+
+        .sidebar-title {
+            font-size: 16px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+
+        .sidebar-subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Progress */
+        .sidebar-progress {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .progress-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 8px;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 4px;
+            background: var(--bg-hover);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent-light));
+            border-radius: 2px;
+            transition: width 0.4s ease;
+        }
+
+        .progress-text {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        /* Nav */
+        .sidebar-nav {
+            flex: 1;
+            padding: 8px 0;
+            overflow-y: auto;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all var(--transition);
+        }
+
+        .nav-item:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background: var(--accent-bg);
+            color: var(--accent-light);
+            font-weight: 600;
+        }
+
+        .nav-step {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+            flex-shrink: 0;
+            background: var(--bg-hover);
+            color: var(--text-muted);
+        }
+
+        .nav-step.completed {
+            background: var(--success-bg);
+            color: var(--success);
+        }
+
+        .sidebar-meta {
+            padding: 10px 16px;
+            font-size: 10px;
+            color: var(--text-muted);
+            text-align: center;
+            border-top: 1px solid var(--border);
+        }
+
+        /* ── MAIN ── */
+        .main {
+            margin-left: var(--sidebar-w);
+            flex: 1;
+            min-width: 0;
+        }
+
+        .doc-wrapper {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 48px 40px 100px;
+        }
+
+        /* ── MARKDOWN RENDERED CONTENT ── */
+        .md-content h1 {
+            font-size: 36px;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .md-content h2 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-top: 48px;
+            margin-bottom: 16px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+            scroll-margin-top: 24px;
+        }
+
+        .md-content h3 {
+            font-size: 17px;
+            font-weight: 700;
+            margin-top: 28px;
+            margin-bottom: 10px;
+            color: var(--accent-light);
+        }
+
+        .md-content p {
+            margin-bottom: 14px;
+            color: var(--text-secondary);
+        }
+
+        .md-content a {
+            color: var(--accent-light);
+            text-decoration: none;
+        }
+
+        .md-content a:hover {
+            text-decoration: underline;
+        }
+
+        .md-content strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .md-content em {
+            color: var(--text-muted);
+        }
+
+        .md-content hr {
+            border: none;
+            height: 1px;
+            background: var(--border);
+            margin: 40px 0;
+        }
+
+        .md-content ul,
+        .md-content ol {
+            padding-left: 24px;
+            margin-bottom: 14px;
+            color: var(--text-secondary);
+        }
+
+        .md-content li {
+            margin-bottom: 4px;
+        }
+
+        .md-content blockquote {
+            border-left: 3px solid var(--accent);
+            padding: 12px 16px;
+            margin: 16px 0;
+            background: var(--accent-bg);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .md-content blockquote strong {
+            color: var(--text-primary);
+        }
+
+        /* Tables */
+        .md-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            font-size: 13px;
+        }
+
+        .md-content th {
+            text-align: left;
+            padding: 10px 14px;
+            font-weight: 700;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            background: var(--bg-card);
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .md-content td {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .md-content tr:hover td {
+            background: var(--bg-hover);
+        }
+
+        /* Code */
+        .md-content code {
+            font-family: var(--font-mono);
+            font-size: 0.88em;
+            background: var(--bg-code);
+            padding: 2px 7px;
+            border-radius: 4px;
+            color: var(--accent-light);
+        }
+
+        .md-content pre {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            overflow-x: auto;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            line-height: 1.6;
+            margin: 16px 0;
+        }
+
+        .md-content pre code {
+            background: none;
+            padding: 0;
+            border-radius: 0;
+        }
+
+        /* Mermaid diagrams */
+        .mermaid-wrapper {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin: 16px 0;
+            overflow: auto;
+        }
+
+        .mermaid-wrapper svg {
+            max-width: 100%;
+        }
+
+        /* ── LIGHT MODE ── */
+        body.light-mode {
+            --bg-page: #ffffff;
+            --bg-sidebar: #f7f8fa;
+            --bg-hover: #f0f1f4;
+            --bg-active: #e8e9f0;
+            --bg-card: #f4f5f7;
+            --bg-code: #f7f8fa;
+            --bg-popup: #ffffff;
+            --border: #e3e4e8;
+            --border-hover: #d0d1d8;
+            --text-primary: #1a1a2e;
+            --text-secondary: #5a5a72;
+            --text-muted: #8e8ea0;
+            --accent-bg: rgba(108, 92, 231, 0.08);
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        body.light-mode .mermaid-wrapper {
+            background: #fafafc;
+        }
+
+        /* ── SOFT MODE ── */
+        body.soft-mode {
+            --bg-page: #f5f0e8;
+            --bg-sidebar: #ece7de;
+            --bg-hover: #e4dfd5;
+            --bg-active: #dbd5ca;
+            --bg-card: #efe9e0;
+            --bg-code: #ece7de;
+            --bg-popup: #f5f0e8;
+            --border: #d5cfc4;
+            --border-hover: #c5bfb4;
+            --text-primary: #4a4237;
+            --text-secondary: #6e6459;
+            --text-muted: #9a8f82;
+            --accent: #7c6f5e;
+            --accent-light: #8b7e6a;
+            --accent-bg: rgba(124, 111, 94, 0.1);
+            --success: #6b8f71;
+            --success-bg: rgba(107, 143, 113, 0.1);
+            --shadow: 0 4px 12px rgba(74, 66, 55, 0.08);
+        }
+
+        /* Theme toggle */
+        #theme-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--bg-sidebar);
+            color: var(--text-secondary);
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow);
+            transition: all 0.15s ease;
+        }
+
+        #theme-toggle:hover {
+            transform: scale(1.1);
+            color: var(--text-primary);
+        }
+
+        /* Refresh hint */
+        .refresh-hint {
+            position: fixed;
+            bottom: 20px;
+            right: 76px;
+            z-index: 1000;
+            padding: 8px 16px;
+            background: var(--bg-sidebar);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 11px;
+            color: var(--text-muted);
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+
+        .refresh-hint:hover {
+            color: var(--accent-light);
+            border-color: var(--accent);
+        }
+
+        /* Scroll */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        @media print {
+
+            .sidebar,
+            #theme-toggle,
+            .refresh-hint {
+                display: none;
+            }
+
+            .main {
+                margin-left: 0;
+            }
+        }
+
+        /* Sub/sup styling */
+        .md-content sub {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <a href="../../index.html" class="sidebar-back">← Volver al Dashboard</a>
+            <div class="sidebar-title" id="sidebar-title">Cargando...</div>
+            <div class="sidebar-subtitle">Documento Técnico · SDLC</div>
+        </div>
+        <div class="sidebar-progress">
+            <div class="progress-label">Progreso</div>
+            <div class="progress-track">
+                <div class="progress-fill" id="progress-bar" style="width:0%"></div>
+            </div>
+            <div class="progress-text"><span id="progress-count">0</span> de 9 fases</div>
+        </div>
+        <nav class="sidebar-nav" id="sidebar-nav"></nav>
+        <div class="sidebar-meta">📐 Projector · Antigravity</div>
+    </aside>
+
+    <main class="main">
+        <div class="doc-wrapper">
+            <div class="md-content" id="md-content">
+                <p style="color:var(--text-muted);text-align:center;padding:60px 0">Cargando documento...</p>
+            </div>
+        </div>
+    </main>
+
+    <button id="theme-toggle" title="Cambiar tema">🌙</button>
+    <div class="refresh-hint" id="refresh-hint" title="Recargar contenido" onclick="location.reload()">⟲ Actualizar
+    </div>
+
+    <script src="content.js"></script>
+    <script>
+        // ── Theme toggle ──
+        (function () {
+            var btn = document.getElementById('theme-toggle');
+            var themes = ['dark', 'light', 'soft'], icons = ['☀️', '🌿', '🌙'], cls = ['', 'light-mode', 'soft-mode'];
+            var cur = 0;
+            var stored = localStorage.getItem('projector-theme');
+            if (stored === 'light') cur = 1; else if (stored === 'soft') cur = 2;
+            function apply() {
+                document.body.classList.remove('light-mode', 'soft-mode');
+                if (cls[cur]) document.body.classList.add(cls[cur]);
+                btn.textContent = icons[cur];
+                localStorage.setItem('projector-theme', themes[cur]);
+            }
+            apply();
+            btn.onclick = function () { cur = (cur + 1) % 3; apply(); renderMermaid(); };
+        })();
+
+        // ── Render Markdown ──
+        function renderDocument() {
+            var md = window.__MD_CONTENT;
+            if (!md) {
+                document.getElementById('md-content').innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:60px 0">No se encontró content.js<br><small>Regenera con: <code>bash init.sh --sync</code></small></p>';
+                return;
+            }
+
+            // Configure marked
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                headerIds: true,
+                mangle: false
+            });
+
+            // Custom renderer for mermaid code blocks
+            var renderer = new marked.Renderer();
+            var originalCode = renderer.code;
+            renderer.code = function (obj) {
+                // Handle both old and new marked.js API
+                var code, lang;
+                if (typeof obj === 'object' && obj !== null) {
+                    code = obj.text || '';
+                    lang = obj.lang || '';
+                } else {
+                    code = obj;
+                    lang = arguments[1] || '';
+                }
+                if (lang === 'mermaid') {
+                    return '<div class="mermaid-wrapper"><pre class="mermaid">' + code + '</pre></div>';
+                }
+                return '<pre><code class="language-' + (lang || '') + '">' + escapeHtml(code) + '</code></pre>';
+            };
+
+            marked.setOptions({ renderer: renderer });
+
+            var html = marked.parse(md);
+            document.getElementById('md-content').innerHTML = html;
+
+            // Extract title from first H1
+            var h1 = document.querySelector('.md-content h1');
+            if (h1) {
+                document.getElementById('sidebar-title').textContent = h1.textContent;
+                document.title = h1.textContent + ' — Projector';
+            }
+
+            buildNav();
+            updateProgress(md);
+            renderMermaid();
+        }
+
+        function escapeHtml(s) {
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        // ── Build sidebar nav from H2 headings ──
+        function buildNav() {
+            var headings = document.querySelectorAll('.md-content h2');
+            var nav = document.getElementById('sidebar-nav');
+            nav.innerHTML = '';
+            headings.forEach(function (h, i) {
+                // Generate/ensure ID
+                if (!h.id) {
+                    h.id = h.textContent.toLowerCase().replace(/[^\w\sáéíóúñü-]/g, '').replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
+                }
+                var a = document.createElement('a');
+                a.href = '#' + h.id;
+                a.className = 'nav-item';
+                a.dataset.section = h.id;
+                var step = document.createElement('div');
+                step.className = 'nav-step';
+                step.id = 'nav-step-' + (i + 1);
+                step.textContent = i + 1;
+                a.appendChild(step);
+                // Short label
+                var label = h.textContent.replace(/^\d+\.\s*/, '');
+                a.appendChild(document.createTextNode(label.length > 22 ? label.slice(0, 22) + '…' : label));
+                nav.appendChild(a);
+            });
+            setupScrollTracking();
+        }
+
+        // ── Scroll tracking ──
+        function setupScrollTracking() {
+            var headings = document.querySelectorAll('.md-content h2');
+            var navItems = document.querySelectorAll('.nav-item');
+            if (!headings.length) return;
+            var observer = new IntersectionObserver(function (entries) {
+                entries.forEach(function (e) {
+                    if (e.isIntersecting) {
+                        navItems.forEach(function (n) { n.classList.remove('active'); });
+                        var match = document.querySelector('.nav-item[data-section="' + e.target.id + '"]');
+                        if (match) match.classList.add('active');
+                    }
+                });
+            }, { rootMargin: '-10% 0px -80% 0px' });
+            headings.forEach(function (h) { observer.observe(h); });
+        }
+
+        // ── Progress from PHASE markers ──
+        function updateProgress(md) {
+            var total = (md.match(/PHASE:[\w-]+:STATUS:/g) || []).length;
+            var completed = (md.match(/STATUS:completed/g) || []).length;
+            if (total === 0) total = 9;
+            document.getElementById('progress-count').textContent = completed;
+            document.getElementById('progress-bar').style.width = Math.round((completed / total) * 100) + '%';
+            // Mark completed nav steps
+            var phases = md.match(/PHASE:([\w-]+):STATUS:(\w+)/g) || [];
+            phases.forEach(function (p, i) {
+                if (p.indexOf('completed') > -1) {
+                    var el = document.getElementById('nav-step-' + (i + 1));
+                    if (el) { el.classList.add('completed'); el.textContent = '✓'; }
+                }
+            });
+        }
+
+        // ── Render Mermaid ──
+        function renderMermaid() {
+            var cur = document.body.classList.contains('light-mode') ? 'default' :
+                document.body.classList.contains('soft-mode') ? 'default' : 'dark';
+            mermaid.initialize({
+                startOnLoad: false, theme: cur, securityLevel: 'loose',
+                flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
+                sequence: { useMaxWidth: true }, gantt: { useMaxWidth: true },
+                er: { useMaxWidth: true }
+            });
+            // Reset and re-render
+            document.querySelectorAll('.mermaid').forEach(function (el) {
+                if (el.dataset.original) {
+                    el.removeAttribute('data-processed');
+                    el.innerHTML = el.dataset.original;
+                } else {
+                    el.dataset.original = el.textContent;
+                }
+            });
+            try { mermaid.run(); } catch (e) { console.warn('Mermaid error:', e); }
+        }
+
+        // ── Init ──
+        renderDocument();
+    </script>
+</body>
+
+</html>

@@ -334,17 +334,27 @@ create_hub_project_with_dir() {
   if [ ! -f "${PROJECT_DIR}/technical-design.html" ]; then
     cp "${TEMPLATES_DIR}/technical-design.html" "${PROJECT_DIR}/technical-design.html"
 
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-      sed -i '' "s/{{PROJECT_NAME}}/${PROJECT_NAME}/g" "${PROJECT_DIR}/technical-design.html"
-      sed -i '' "s/{{PROJECT_DESCRIPTION}}/${PROJECT_DESC}/g" "${PROJECT_DIR}/technical-design.html"
-      sed -i '' "s/{{DATE}}/${DATE}/g" "${PROJECT_DIR}/technical-design.html"
-    else
-      sed -i "s/{{PROJECT_NAME}}/${PROJECT_NAME}/g" "${PROJECT_DIR}/technical-design.html"
-      sed -i "s/{{PROJECT_DESCRIPTION}}/${PROJECT_DESC}/g" "${PROJECT_DIR}/technical-design.html"
-      sed -i "s/{{DATE}}/${DATE}/g" "${PROJECT_DIR}/technical-design.html"
+    # Also create Markdown version (visible on GitHub)
+    if [ -f "${TEMPLATES_DIR}/technical-design.md" ]; then
+      cp "${TEMPLATES_DIR}/technical-design.md" "${PROJECT_DIR}/technical-design.md"
     fi
 
-    success "Documento técnico creado: ${PROJECT_DIR}/technical-design.html"
+    # Replace placeholders in both files
+    for ext in html md; do
+      local f="${PROJECT_DIR}/technical-design.${ext}"
+      [ -f "$f" ] || continue
+      if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "s/{{PROJECT_NAME}}/${PROJECT_NAME}/g" "$f"
+        sed -i '' "s/{{PROJECT_DESCRIPTION}}/${PROJECT_DESC}/g" "$f"
+        sed -i '' "s/{{DATE}}/${DATE}/g" "$f"
+      else
+        sed -i "s/{{PROJECT_NAME}}/${PROJECT_NAME}/g" "$f"
+        sed -i "s/{{PROJECT_DESCRIPTION}}/${PROJECT_DESC}/g" "$f"
+        sed -i "s/{{DATE}}/${DATE}/g" "$f"
+      fi
+    done
+
+    success "Documentos creados: technical-design.html + technical-design.md"
 
     # Update metadata.js
     local META="${HUB_DIR}/metadata.js"
@@ -394,7 +404,11 @@ init_standalone_core() {
 
   if [ ! -f "${TARGET_DIR}/technical-design.html" ]; then
     cp "${TEMPLATES_DIR}/technical-design.html" "${TARGET_DIR}/technical-design.html"
-    success "Template copiado a ${TARGET_DIR}/technical-design.html"
+    # Also create Markdown version
+    if [ -f "${TEMPLATES_DIR}/technical-design.md" ]; then
+      cp "${TEMPLATES_DIR}/technical-design.md" "${TARGET_DIR}/technical-design.md"
+    fi
+    success "Templates copiados: .html + .md"
     open_browser "${TARGET_DIR}/technical-design.html"
   else
     log "Documento técnico ya existe, no se sobreescribe"

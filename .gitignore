@@ -1,0 +1,4 @@
+.DS_Store
+.projector/
+node_modules/
+*.log

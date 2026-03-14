@@ -12,54 +12,54 @@ view_file ~/.gemini/antigravity/skills/software-design/SKILL.md
 
 // turbo-all
 
-## Paso 1: Detectar Modo y Bootstrapping
+## Paso 1: Inicialización Completa (ejecutar todo sin pausas)
 
+> **IMPORTANTE**: Tú (el agente) ejecutas TODOS estos comandos directamente usando `run_command`. El usuario autoriza cada ejecución. NO le digas al usuario que ejecute comandos manualmente. Después de crear el proyecto, continúa AUTOMÁTICAMENTE con la Fase 1.
+
+### 1.1 Detectar Modo
 Determina el modo según el comando del usuario:
 - `/software-design` → **Standalone** (crea `.projector/` en el workspace actual)
 - `/software-design hub` → **Hub** (crea/usa `~/Projects/<org>/`)
 
-> **IMPORTANTE**: Tú (el agente) ejecutas estos comandos directamente usando `run_command`. El usuario autoriza cada ejecución. NO le digas al usuario que ejecute comandos manualmente.
+### 1.2 Preguntar Datos del Proyecto
+Usa `notify_user` para preguntar:
+1. **Nombre de la organización** (solo en modo hub)
+2. **Nombre del proyecto**
+3. **Descripción breve del proyecto** — pide que sea detallada, es el contexto que usarás para las fases
 
-Ejecuta el script de init con `run_command` (SafeToAutoRun=false para que el usuario apruebe):
+### 1.3 Crear el Proyecto
+Ejecuta con `run_command` (SafeToAutoRun=false):
 ```bash
 # Standalone
-bash ~/.gemini/antigravity/skills/software-design/scripts/init.sh
+bash ~/.gemini/antigravity/skills/software-design/scripts/init.sh --standalone
 
-# Hub (requiere nombre de la org GitHub)
-bash ~/.gemini/antigravity/skills/software-design/scripts/init.sh --hub <org-name>
-```
-
-## Paso 2: Datos del Proyecto
-
-Pregunta al usuario (vía `notify_user`):
-1. **Nombre del proyecto** (se usará para `{{PROJECT_NAME}}`)
-2. **Descripción breve** (para `{{PROJECT_DESCRIPTION}}`)
-
-Una vez tengas los datos, ejecuta el comando de creación de proyecto tú mismo:
-```bash
-# Standalone: los placeholders se reemplazan con replace_file_content
-# Hub: ejecuta con run_command (el usuario aprobará)
+# Hub
 bash ~/.gemini/antigravity/skills/software-design/scripts/init.sh --hub <org-name> "<nombre>" "<descripción>"
 ```
 
-## Paso 3: Abrir en Navegador
+### 1.4 Confirmar creación y arrancar
+Después de que el script confirme la creación:
+1. Localiza el archivo `technical-design.md` generado
+2. **NO te detengas** — continúa directamente al Paso 2 (Fase 1 del SDLC)
 
-Abre el documento en el navegador con `run_command`:
-```bash
-# Ejecuta tú directamente (SafeToAutoRun=true, es seguro)
-open <ruta-al-archivo>.html
-```
-- **Standalone:** `open .projector/technical-design.html`
-- **Hub:** `open ~/Projects/<org>/projects/<nombre>/technical-design.html`
+## Paso 2: Fase 1 — Planteamiento del Problema (iniciar automáticamente)
 
-## Paso 4: Iterar por las 9 Fases SDLC
+> **⚡ ARRANQUE AUTOMÁTICO**: Después de crear el proyecto, comienza esta fase sin esperar. Usa la descripción del proyecto como contexto para generar el contenido inicial.
 
-Para cada fase (1-9), sigue este ciclo:
+1. Lee la descripción proporcionada por el usuario en el paso anterior
+2. Genera el contenido de la Fase 1 directamente en `technical-design.md`
+3. Usa `replace_file_content` para reemplazar la sección `<!-- PHASE:problem-statement:STATUS:pending -->`
+4. Marca como completada: `STATUS:pending` → `STATUS:completed`
+5. Notifica al usuario con `notify_user` mostrando lo que generaste y preguntando si desea ajustes o avanzar
 
-### 4.1 Preguntar al usuario
+## Paso 3: Iterar Fases 2-9 del SDLC
+
+Para cada fase restante (2-9), sigue este ciclo:
+
+### 3.1 Preguntar al usuario
 Usa `notify_user` para preguntar qué contenido incluir en la fase actual.
 
-### 4.2 Generar contenido
+### 3.2 Generar contenido
 > **IMPORTANTE**: Genera el contenido en **Markdown** y edita el archivo `technical-design.md`. Este es el archivo **fuente de verdad** y se renderiza en GitHub.
 
 Usa formato estándar Markdown:
@@ -68,7 +68,7 @@ Usa formato estándar Markdown:
 - **Diagramas**: Bloques Mermaid (` ```mermaid ... ``` `) — GitHub los renderiza nativamente
 - **Código**: Bloques fenced (` ```lang ... ``` `)
 
-### 4.3 Actualizar el Markdown
+### 3.3 Actualizar el Markdown
 Usa `replace_file_content` en `technical-design.md` para:
 1. Reemplazar el contenido placeholder de la fase (entre marcadores `<!-- PHASE:xxx:STATUS:pending -->`)
 2. Cambiar el marcador de estado: `STATUS:pending` → `STATUS:completed`
@@ -84,10 +84,10 @@ Ejemplo:
 [Contenido real generado]
 ```
 
-### 4.4 Confirmar y avanzar
+### 3.4 Confirmar y avanzar
 Pregunta al usuario si desea ajustar algo o avanzar a la siguiente fase.
 
-## Paso 5: Finalización
+## Paso 4: Finalización
 
 Al completar todas las fases:
 1. Actualiza el estado general del marcador de cada fase a `completed`

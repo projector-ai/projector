@@ -1153,6 +1153,94 @@
       border: none;
     }
 
+    /* AI text blocks */
+    .doc-block[data-type="ai-text"] {
+      border: 1px dashed var(--accent-light);
+      background: var(--accent-bg);
+      cursor: pointer;
+      position: relative;
+    }
+
+    .doc-block[data-type="ai-text"]:hover {
+      border-color: var(--accent);
+      background: var(--accent-bg-hover);
+    }
+
+    .doc-block[data-type="ai-text"]::after {
+      content: '🤖 Clic para instrucciones';
+      position: absolute;
+      top: 50%;
+      right: 12px;
+      transform: translateY(-50%);
+      font-size: 11px;
+      color: var(--accent-light);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+
+    .doc-block[data-type="ai-text"]:hover::after {
+      opacity: 1;
+    }
+
+    .doc-block[data-type="ai-text"]:not(:empty)::after {
+      display: none;
+    }
+
+    .ai-tooltip {
+      position: fixed;
+      z-index: 2000;
+      background: var(--bg-popup);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      box-shadow: var(--shadow-lg);
+      max-width: 340px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-primary);
+      animation: fadeInUp 0.15s ease;
+    }
+
+    .ai-tooltip h4 {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--accent);
+    }
+
+    .ai-tooltip code {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 4px 10px;
+      background: var(--accent-bg);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+    }
+
+    .ai-tooltip-close {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
     /* ── DARK MODE ── */
     body.dark-mode {
       --bg-page: #0f0f17;
@@ -1810,6 +1898,31 @@
         }
         // Close pickers on outside click
         document.querySelectorAll('.block-picker.visible').forEach(p => p.classList.remove('visible'));
+      });
+
+      // Click on AI text blocks → show tooltip
+      document.addEventListener('click', e => {
+        const aiBlock = e.target.closest('.doc-block[data-type="ai-text"]');
+        // Remove existing tooltips
+        document.querySelectorAll('.ai-tooltip').forEach(t => t.remove());
+        if (!aiBlock) return;
+        if (aiBlock.contentEditable === 'true') return; // already editing via dblclick
+        const rect = aiBlock.getBoundingClientRect();
+        const tooltip = document.createElement('div');
+        tooltip.className = 'ai-tooltip';
+        tooltip.innerHTML = `<button class="ai-tooltip-close">&times;</button>
+          <h4>🤖 Bloque de texto IA</h4>
+          <p>Este bloque será llenado por el agente de Antigravity durante el workflow SDLC.</p>
+          <p><strong>Para llenarlo:</strong> pídele al agente con <code>/software-design</code></p>
+          <p style="color:var(--text-muted);font-size:11px;margin-top:6px;">Doble clic para editar manualmente</p>`;
+        tooltip.style.left = Math.min(rect.left, window.innerWidth - 360) + 'px';
+        tooltip.style.top = (rect.bottom + 8) + 'px';
+        document.body.appendChild(tooltip);
+        tooltip.querySelector('.ai-tooltip-close').onclick = () => tooltip.remove();
+        setTimeout(() => {
+          const close = e2 => { if (!tooltip.contains(e2.target) && !aiBlock.contains(e2.target)) { tooltip.remove(); document.removeEventListener('click', close); } };
+          document.addEventListener('click', close);
+        }, 100);
       });
 
       // Double-click to edit doc-blocks

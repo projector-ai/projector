@@ -495,6 +495,97 @@
             color: var(--text-muted);
         }
 
+        /* Diagram fullscreen */
+        .mermaid-wrapper {
+            position: relative;
+        }
+
+        .diagram-expand {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg-sidebar);
+            color: var(--text-muted);
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity var(--transition);
+            z-index: 5;
+        }
+
+        .mermaid-wrapper:hover .diagram-expand {
+            opacity: 1;
+        }
+
+        .diagram-expand:hover {
+            color: var(--text-primary);
+            background: var(--bg-hover);
+        }
+
+        .diagram-fullscreen-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 3000;
+            background: var(--bg-page);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.15s ease;
+        }
+
+        .diagram-fullscreen-overlay svg {
+            max-width: 90vw;
+            max-height: 85vh;
+        }
+
+        .diagram-fullscreen-close {
+            position: absolute;
+            top: 20px;
+            right: 24px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--bg-sidebar);
+            color: var(--text-primary);
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .diagram-fullscreen-close:hover {
+            background: var(--bg-hover);
+        }
+
+        .diagram-fullscreen-title {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            font-size: 13px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
         /* ── CONTEXT MENU ── */
         .ctx-menu {
             position: fixed;
@@ -855,34 +946,27 @@
                 return;
             }
 
-            // Configure marked
-            marked.setOptions({
+            // Use marked.use() for modern API (v12+)
+            marked.use({
                 breaks: true,
                 gfm: true,
-                headerIds: true,
-                mangle: false
+                renderer: {
+                    code: function (obj) {
+                        var code, lang;
+                        if (typeof obj === 'object' && obj !== null) {
+                            code = obj.text || obj.raw || '';
+                            lang = obj.lang || '';
+                        } else {
+                            code = String(obj);
+                            lang = arguments[1] || '';
+                        }
+                        if (lang === 'mermaid') {
+                            return '<div class="mermaid-wrapper"><button class="diagram-expand" title="Pantalla completa">⛶</button><pre class="mermaid">' + code + '</pre></div>';
+                        }
+                        return '<pre><code class="language-' + (lang || '') + '">' + escapeHtml(code) + '</code></pre>';
+                    }
+                }
             });
-
-            // Custom renderer for mermaid code blocks
-            var renderer = new marked.Renderer();
-            var originalCode = renderer.code;
-            renderer.code = function (obj) {
-                // Handle both old and new marked.js API
-                var code, lang;
-                if (typeof obj === 'object' && obj !== null) {
-                    code = obj.text || '';
-                    lang = obj.lang || '';
-                } else {
-                    code = obj;
-                    lang = arguments[1] || '';
-                }
-                if (lang === 'mermaid') {
-                    return '<div class="mermaid-wrapper"><pre class="mermaid">' + code + '</pre></div>';
-                }
-                return '<pre><code class="language-' + (lang || '') + '">' + escapeHtml(code) + '</code></pre>';
-            };
-
-            marked.setOptions({ renderer: renderer });
 
             var html = marked.parse(md);
             document.getElementById('md-content').innerHTML = html;
@@ -985,6 +1069,24 @@
             });
             try { mermaid.run(); } catch (e) { console.warn('Mermaid error:', e); }
         }
+
+        // ── Diagram Fullscreen ──
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.diagram-expand');
+            if (!btn) return;
+            var wrapper = btn.closest('.mermaid-wrapper');
+            var svg = wrapper.querySelector('svg');
+            if (!svg) return;
+            var overlay = document.createElement('div');
+            overlay.className = 'diagram-fullscreen-overlay';
+            overlay.innerHTML = '<span class="diagram-fullscreen-title">📊 Diagrama</span><button class="diagram-fullscreen-close">✕</button>';
+            overlay.appendChild(svg.cloneNode(true));
+            document.body.appendChild(overlay);
+            var close = function () { overlay.remove(); };
+            overlay.querySelector('.diagram-fullscreen-close').onclick = close;
+            overlay.addEventListener('click', function (ev) { if (ev.target === overlay) close(); });
+            document.addEventListener('keydown', function handler(ev) { if (ev.key === 'Escape') { close(); document.removeEventListener('keydown', handler); } });
+        });
 
         // ── Comments System ──
         (function () {

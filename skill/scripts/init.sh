@@ -293,14 +293,22 @@ init_hub() {
 
   if [ ! -f "${HUB_DIR}/index.html" ]; then
     cp "${TEMPLATES_DIR}/dashboard.html" "${HUB_DIR}/index.html"
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-      sed -i '' "s/Projector/Projector · ${ORG_NAME}/g" "${HUB_DIR}/index.html"
-    else
-      sed -i "s/Projector/Projector · ${ORG_NAME}/g" "${HUB_DIR}/index.html"
-    fi
     success "Dashboard creado: ${HUB_DIR}/index.html"
   else
     log "Dashboard ya existe, no se sobreescribe"
+  fi
+
+  # Create metadata.json
+  if [ ! -f "${HUB_DIR}/metadata.js" ]; then
+    cat > "${HUB_DIR}/metadata.js" <<EOF
+window.__PROJECTOR_META = {
+  "organization": "${ORG_NAME}",
+  "created": "${DATE}",
+  "github": "https://github.com/${ORG_NAME}",
+  "projects": []
+};
+EOF
+    success "Metadata creado: ${HUB_DIR}/metadata.js"
   fi
 
   success "Hub '${ORG_NAME}' listo en: ${HUB_DIR}"
@@ -337,6 +345,23 @@ create_hub_project_with_dir() {
     fi
 
     success "Documento técnico creado: ${PROJECT_DIR}/technical-design.html"
+
+    # Update metadata.js
+    local META="${HUB_DIR}/metadata.js"
+    if [ -f "${META}" ] && command -v python3 &> /dev/null; then
+      python3 <<PYEOF
+import json, re
+with open('${META}','r') as f: content=f.read()
+match = re.search(r'window\.__PROJECTOR_META\s*=\s*({.*});', content, re.DOTALL)
+if match:
+    data = json.loads(match.group(1))
+    data['projects'].append({'name':'${PROJECT_NAME}','description':'${PROJECT_DESC}','status':'active','created':'${DATE}','phase':0,'phases':9})
+    with open('${META}','w') as f:
+        f.write('window.__PROJECTOR_META = ' + json.dumps(data, indent=2, ensure_ascii=False) + ';\n')
+PYEOF
+      success "Metadata actualizado"
+    fi
+
     open_browser "${PROJECT_DIR}/technical-design.html"
   else
     log "El proyecto '${PROJECT_NAME}' ya existe"

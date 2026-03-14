@@ -16,15 +16,17 @@ view_file ~/.gemini/antigravity/skills/software-design/SKILL.md
 
 Determina el modo según el comando del usuario:
 - `/software-design` → **Standalone** (crea `.projector/` en el workspace actual)
-- `/software-design hub` → **Hub** (crea/usa `~/projector-hub/`)
+- `/software-design hub` → **Hub** (crea/usa `~/Projects/<org>/`)
 
-Ejecuta el script de init correspondiente:
+> **IMPORTANTE**: Tú (el agente) ejecutas estos comandos directamente usando `run_command`. El usuario autoriza cada ejecución. NO le digas al usuario que ejecute comandos manualmente.
+
+Ejecuta el script de init con `run_command` (SafeToAutoRun=false para que el usuario apruebe):
 ```bash
 # Standalone
 bash ~/.gemini/antigravity/skills/software-design/scripts/init.sh
 
-# Hub
-bash ~/.gemini/antigravity/skills/software-design/scripts/init.sh --hub
+# Hub (requiere nombre de la org GitHub)
+bash ~/.gemini/antigravity/skills/software-design/scripts/init.sh --hub <org-name>
 ```
 
 ## Paso 2: Datos del Proyecto
@@ -33,22 +35,22 @@ Pregunta al usuario (vía `notify_user`):
 1. **Nombre del proyecto** (se usará para `{{PROJECT_NAME}}`)
 2. **Descripción breve** (para `{{PROJECT_DESCRIPTION}}`)
 
-Reemplaza los placeholders en el archivo `technical-design.html`:
-- `{{PROJECT_NAME}}` → nombre del proyecto
-- `{{PROJECT_DESCRIPTION}}` → descripción
-- `{{DATE}}` → fecha actual (YYYY-MM-DD)
-
-**Standalone:** el archivo está en `.projector/technical-design.html`
-**Hub:** crear carpeta y copiar template:
+Una vez tengas los datos, ejecuta el comando de creación de proyecto tú mismo:
 ```bash
-bash ~/.gemini/antigravity/skills/software-design/scripts/init.sh --hub ~/projector-hub "<nombre>"  "<descripción>"
+# Standalone: los placeholders se reemplazan con replace_file_content
+# Hub: ejecuta con run_command (el usuario aprobará)
+bash ~/.gemini/antigravity/skills/software-design/scripts/init.sh --hub <org-name> "<nombre>" "<descripción>"
 ```
 
 ## Paso 3: Abrir en Navegador
 
-Abre el documento en el navegador con `browser_subagent`:
-- **Standalone:** `file:///<workspace>/.projector/technical-design.html`
-- **Hub:** `file:///Users/alan.reynoso/projector-hub/projects/<nombre>/technical-design.html`
+Abre el documento en el navegador con `run_command`:
+```bash
+# Ejecuta tú directamente (SafeToAutoRun=true, es seguro)
+open <ruta-al-archivo>.html
+```
+- **Standalone:** `open .projector/technical-design.html`
+- **Hub:** `open ~/Projects/<org>/projects/<nombre>/technical-design.html`
 
 ## Paso 4: Iterar por las 9 Fases SDLC
 

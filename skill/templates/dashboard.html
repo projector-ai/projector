@@ -339,6 +339,51 @@
             color: var(--accent-secondary);
         }
 
+        /* Create button */
+        .btn-create {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: var(--gradient-accent);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius-md);
+            font-family: var(--font-sans);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            box-shadow: 0 0 16px var(--accent-glow);
+        }
+
+        .btn-create:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 0 24px var(--accent-glow);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .section-header .section-title {
+            margin-bottom: 0;
+        }
+
+        .github-link {
+            font-size: 13px;
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color var(--transition-fast);
+        }
+
+        .github-link:hover {
+            color: var(--accent-secondary);
+        }
+
         /* Footer */
         .dashboard-footer {
             margin-top: 64px;
@@ -453,66 +498,85 @@
         <header class="dashboard-header">
             <div class="dashboard-logo">
                 <div class="dashboard-logo-icon">📐</div>
-                <h1>Projector</h1>
+                <h1 id="org-title">Projector</h1>
             </div>
-            <p class="dashboard-subtitle">Gestor de Proyectos de Software · Asistido por Antigravity</p>
+            <p class="dashboard-subtitle"><a id="github-link" class="github-link" href="#" target="_blank"></a> · Asistido por Antigravity</p>
         </header>
 
         <div class="stats-bar" id="stats-bar">
-            <div class="stat-card">
-                <div class="stat-icon">📁</div>
-                <div>
-                    <div class="stat-value" id="stat-total">0</div>
-                    <div class="stat-label">Proyectos</div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">🚀</div>
-                <div>
-                    <div class="stat-value" id="stat-active">0</div>
-                    <div class="stat-label">Activos</div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">💬</div>
-                <div>
-                    <div class="stat-value" id="stat-comments">0</div>
-                    <div class="stat-label">Comentarios</div>
-                </div>
-            </div>
+            <div class="stat-card"><div class="stat-icon">📁</div><div><div class="stat-value" id="stat-total">0</div><div class="stat-label">Proyectos</div></div></div>
+            <div class="stat-card"><div class="stat-icon">🚀</div><div><div class="stat-value" id="stat-active">0</div><div class="stat-label">Activos</div></div></div>
+            <div class="stat-card"><div class="stat-icon">✅</div><div><div class="stat-value" id="stat-completed">0</div><div class="stat-label">Completados</div></div></div>
         </div>
 
-        <div class="section-title">Proyectos</div>
-
-        <!-- PROJECT LIST — Agent will add <a class="project-card"> elements here -->
-        <div class="projects-grid" id="projects-grid">
-            <div class="empty-state">
-                <div class="empty-state-icon">📋</div>
-                <h3>Sin proyectos aún</h3>
-                <p>Usa Antigravity con el workflow para crear tu primer proyecto de diseño de software.</p>
-                <code>/software-design</code>
-            </div>
+        <div class="section-header">
+            <div class="section-title">Proyectos</div>
+            <button class="btn-create" id="btn-create" onclick="createProject()">➕ Nuevo Proyecto</button>
         </div>
+
+        <div class="projects-grid" id="projects-grid"></div>
 
         <footer class="dashboard-footer">
             Projector · Generado con Antigravity · SDLC Workflow
         </footer>
     </div>
-    <button id="theme-toggle" title="Modo claro / oscuro">☀️</button>
+    <button id="theme-toggle" title="Cambiar tema">☀️</button>
+    <script src="metadata.js"></script>
     <script>
-        const btn = document.getElementById('theme-toggle');
-        const themes = ['dark', 'light', 'soft'], icons = ['☀️', '🌿', '🌙'], classes = ['', 'light-mode', 'soft-mode'];
-        let cur = 0;
-        const stored = localStorage.getItem('projector-theme');
-        if (stored === 'light') cur = 1; else if (stored === 'soft') cur = 2;
-        function apply() {
-            document.body.classList.remove('light-mode', 'soft-mode');
-            if (classes[cur]) document.body.classList.add(classes[cur]);
-            btn.textContent = icons[cur]; localStorage.setItem('projector-theme', themes[cur]);
+        const btn=document.getElementById('theme-toggle');
+        const themes=['dark','light','soft'],icons=['☀️','🌿','🌙'],cls=['','light-mode','soft-mode'];
+        let cur=0;
+        const stored=localStorage.getItem('projector-theme');
+        if(stored==='light')cur=1;else if(stored==='soft')cur=2;
+        function applyTheme(){document.body.classList.remove('light-mode','soft-mode');
+          if(cls[cur])document.body.classList.add(cls[cur]);
+          btn.textContent=icons[cur];localStorage.setItem('projector-theme',themes[cur]);}
+        applyTheme();
+        btn.onclick=function(){cur=(cur+1)%3;applyTheme();};
+
+        function loadMetadata(){
+          var data=window.__PROJECTOR_META;
+          if(data){renderDashboard(data);}else{renderEmpty();}
         }
-        apply();
-        btn.onclick = () => { cur = (cur + 1) % 3; apply(); };
+        function renderDashboard(data){
+          document.getElementById('org-title').textContent=data.organization||'Projector';
+          document.title=(data.organization||'Projector')+' — Projector';
+          var ghLink=document.getElementById('github-link');
+          if(data.github){ghLink.href=data.github;ghLink.textContent=data.github.replace('https://github.com/','@');}
+          else{ghLink.textContent='Gestor de Proyectos';}
+          var projects=data.projects||[];
+          document.getElementById('stat-total').textContent=projects.length;
+          document.getElementById('stat-active').textContent=projects.filter(function(p){return p.status==='active';}).length;
+          document.getElementById('stat-completed').textContent=projects.filter(function(p){return p.status==='completed';}).length;
+          var grid=document.getElementById('projects-grid');
+          if(projects.length===0){renderEmpty();return;}
+          grid.innerHTML=projects.map(function(p){
+            var pct=p.phases>0?Math.round((p.phase/p.phases)*100):0;
+            var sc=p.status==='completed'?'status-draft':'status-active';
+            var st=p.status==='completed'?'Completado':'Activo';
+            return '<a class="project-card" href="projects/'+p.name+'/technical-design.html">'
+              +'<div class="project-card-header"><div class="project-card-title">'+p.name+'</div>'
+              +'<span class="project-card-status '+sc+'">'+st+'</span></div>'
+              +'<div class="project-card-desc">'+(p.description||'Sin descripción')+'</div>'
+              +'<div class="project-card-progress"><div class="project-card-progress-bar">'
+              +'<div class="project-card-progress-fill" style="width:'+pct+'%"></div></div>'
+              +'<div class="project-card-progress-text">'+(p.phase||0)+' de '+(p.phases||9)+' fases</div></div>'
+              +'<div class="project-card-meta"><span>📅 '+(p.created||'-')+'</span></div></a>';
+          }).join('');
+        }
+        function renderEmpty(){
+          document.getElementById('projects-grid').innerHTML='<div class="empty-state"><div class="empty-state-icon">📋</div>'
+            +'<h3>Sin proyectos aún</h3>'
+            +'<p>Crea tu primer proyecto con el botón de arriba o pídele al agente con <code>/software-design hub</code></p></div>';
+        }
+        function createProject(){
+          var name=prompt('Nombre del proyecto:');
+          if(!name)return;
+          var desc=prompt('Descripción breve (opcional):')||'';
+          var org=(window.__PROJECTOR_META&&window.__PROJECTOR_META.organization)||'org';
+          alert('Pídele al agente de Antigravity que ejecute:\n\n/software-design hub\n\nNombre: '+name+'\nDescripción: '+desc+'\n\nEl agente ejecutará el comando de inicialización con tu autorización.');
+        }
+        loadMetadata();
     </script>
 </body>
-
 </html>

@@ -590,12 +590,19 @@ METAEOF
       fi
     fi
 
-    # If repo is NOT inside projects/, create symlink
+    # If repo is NOT inside projects/, symlink the whole .projector dir
     if [ "$IS_IN_PROJECTS" != "yes" ]; then
       local LINK="${HUB_PATH}/projects/${REPO_NAME}"
       if [ ! -e "$LINK" ]; then
         ln -s "${PROJ_DIR}" "$LINK"
       fi
+    else
+      # Repo IS inside projects/ — create file symlinks at repo root
+      for vfile in index.html content.js technical-design.md; do
+        if [ -f "${PROJ_DIR}/${vfile}" ] && [ ! -e "${dir}/${vfile}" ]; then
+          ln -s ".projector/${vfile}" "${dir}/${vfile}"
+        fi
+      done
     fi
 
     # Add to metadata if not present

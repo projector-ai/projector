@@ -398,6 +398,211 @@ PYEOF
   fi
 }
 
+# ── Link existing repo into hub ──
+link_existing_repo() {
+  local ORG_NAME="$1"
+  local REPO_PATH="$(cd "$2" 2>/dev/null && pwd)"  # resolve absolute path
+  local DESC="${3:-}"
+
+  if [ ! -d "$REPO_PATH" ]; then
+    error "Directorio no encontrado: $2"
+    exit 1
+  fi
+
+  local REPO_NAME=$(basename "$REPO_PATH")
+  local DATE=$(date +%Y-%m-%d)
+  local HUB_DIR="${PROJECTS_ROOT}/${ORG_NAME}"
+
+  if [ ! -d "$HUB_DIR" ]; then
+    error "Hub no encontrado: $HUB_DIR"
+    echo -e "  Primero crea el hub: ${CYAN}bash init.sh --hub ${ORG_NAME}${NC}"
+    exit 1
+  fi
+
+  # If no description, try to get from git remote or use default
+  if [ -z "$DESC" ]; then
+    DESC=$(cd "$REPO_PATH" && git remote get-url origin 2>/dev/null | sed 's|.*/||;s|\.git$||' || echo "Proyecto")
+    DESC="Proyecto ${REPO_NAME}"
+  fi
+
+  log "Vinculando '${REPO_NAME}' desde ${CYAN}${REPO_PATH}${NC}"
+
+  # Create .projector inside the repo
+  local PROJECTOR_DIR="${REPO_PATH}/.projector"
+  mkdir -p "${PROJECTOR_DIR}"
+
+  if [ ! -f "${PROJECTOR_DIR}/technical-design.md" ]; then
+    cp "${TEMPLATES_DIR}/technical-design.md" "${PROJECTOR_DIR}/technical-design.md"
+    cp "${TEMPLATES_DIR}/viewer.html" "${PROJECTOR_DIR}/index.html"
+
+    # Replace placeholders
+    local f="${PROJECTOR_DIR}/technical-design.md"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      sed -i '' "s/{{PROJECT_NAME}}/${REPO_NAME}/g" "$f"
+      sed -i '' "s/{{PROJECT_DESCRIPTION}}/${DESC}/g" "$f"
+      sed -i '' "s/{{DATE}}/${DATE}/g" "$f"
+    else
+      sed -i "s/{{PROJECT_NAME}}/${REPO_NAME}/g" "$f"
+      sed -i "s/{{PROJECT_DESCRIPTION}}/${DESC}/g" "$f"
+      sed -i "s/{{DATE}}/${DATE}/g" "$f"
+    fi
+
+    sync_content_js "${PROJECTOR_DIR}/technical-design.md"
+    success "Documentos creados en ${REPO_NAME}/.projector/"
+  else
+    log "Ya existe .projector/ en ${REPO_NAME}, no se sobreescribe"
+  fi
+
+  # Create symlink in hub
+  local LINK_PATH="${HUB_DIR}/projects/${REPO_NAME}"
+  if [ ! -e "$LINK_PATH" ]; then
+    ln -s "${PROJECTOR_DIR}" "$LINK_PATH"
+    success "Symlink creado: projects/${REPO_NAME} → ${REPO_PATH}/.projector"
+  else
+    log "Link ya existe: projects/${REPO_NAME}"
+  fi
+
+  # Update metadata.js
+  local META="${HUB_DIR}/metadata.js"
+  if [ -f "${META}" ] && command -v python3 &> /dev/null; then
+    python3 <<PYEOF
+import json, re
+with open('${META}','r') as f: content=f.read()
+match = re.search(r'window\.__PROJECTOR_META\s*=\s*({.*});', content, re.DOTALL)
+if match:
+    data = json.loads(match.group(1))
+    # Check if already registered
+    if not any(p['name'] == '${REPO_NAME}' for p in data['projects']):
+        data['projects'].append({'name':'${REPO_NAME}','description':'${DESC}','status':'active','created':'${DATE}','phase':0,'phases':9,'linked':'${REPO_PATH}'})
+        with open('${META}','w') as f:
+            f.write('window.__PROJECTOR_META = ' + json.dumps(data, indent=2, ensure_ascii=False) + ';\n')
+PYEOF
+    success "Metadata actualizado"
+  fi
+
+  echo ""
+  echo -e "  Abrir visor:   ${CYAN}python3 -m http.server 8765 --directory ${HUB_DIR}${NC}"
+  echo -e "  Luego:         ${CYAN}http://localhost:8765/projects/${REPO_NAME}/index.html${NC}"
+  echo ""
+}
+
+# ── Scan local directory as hub ──
+scan_local_hub() {
+  local HUB_PATH="$(cd "$1" 2>/dev/null && pwd)"
+  if [ ! -d "$HUB_PATH" ]; then
+    error "Directorio no encontrado: $1"
+    exit 1
+  fi
+
+  local HUB_NAME=$(basename "$HUB_PATH")
+  local DATE=$(date +%Y-%m-%d)
+
+  echo ""
+  echo -e "${BOLD}📐 Projector — Escaneando directorio local${NC}"
+  echo ""
+  log "Hub: ${CYAN}${HUB_PATH}${NC} (${HUB_NAME})"
+
+  # Create hub infrastructure if not exists
+  mkdir -p "${HUB_PATH}/projects"
+
+  if [ ! -f "${HUB_PATH}/index.html" ]; then
+    cp "${TEMPLATES_DIR}/dashboard.html" "${HUB_PATH}/index.html"
+  fi
+
+  # Create or update metadata
+  local META="${HUB_PATH}/metadata.js"
+  if [ ! -f "$META" ]; then
+    cat > "$META" << METAEOF
+window.__PROJECTOR_META = {
+  "org": "${HUB_NAME}",
+  "github": "",
+  "created": "${DATE}",
+  "projects": []
+};
+METAEOF
+    success "Dashboard + metadata creados"
+  fi
+
+  # Scan for repos (directories with .git)
+  local COUNT=0
+  for dir in "${HUB_PATH}"/*/; do
+    [ ! -d "$dir" ] && continue
+    local REPO_NAME=$(basename "$dir")
+    # Skip projector internal dirs
+    [ "$REPO_NAME" = "projects" ] && continue
+    [ "$REPO_NAME" = ".projector" ] && continue
+
+    # Check if it's a repo (has .git or has source files)
+    if [ ! -d "${dir}.git" ] && [ ! -f "${dir}package.json" ] && [ ! -f "${dir}go.mod" ] && [ ! -f "${dir}Cargo.toml" ]; then
+      continue
+    fi
+
+    log "Encontrado: ${CYAN}${REPO_NAME}${NC}"
+
+    # Get description from git or default
+    local DESC=""
+    if [ -d "${dir}.git" ]; then
+      DESC=$(cd "$dir" && git remote get-url origin 2>/dev/null | sed 's|.*/||;s|\.git$||' || echo "")
+    fi
+    [ -z "$DESC" ] && DESC="Proyecto ${REPO_NAME}"
+
+    # Create .projector inside repo
+    local PROJ_DIR="${dir}.projector"
+    mkdir -p "$PROJ_DIR"
+
+    if [ ! -f "${PROJ_DIR}/technical-design.md" ]; then
+      cp "${TEMPLATES_DIR}/technical-design.md" "${PROJ_DIR}/technical-design.md"
+      cp "${TEMPLATES_DIR}/viewer.html" "${PROJ_DIR}/index.html"
+
+      local f="${PROJ_DIR}/technical-design.md"
+      if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "s/{{PROJECT_NAME}}/${REPO_NAME}/g" "$f"
+        sed -i '' "s/{{PROJECT_DESCRIPTION}}/${DESC}/g" "$f"
+        sed -i '' "s/{{DATE}}/${DATE}/g" "$f"
+      else
+        sed -i "s/{{PROJECT_NAME}}/${REPO_NAME}/g" "$f"
+        sed -i "s/{{PROJECT_DESCRIPTION}}/${DESC}/g" "$f"
+        sed -i "s/{{DATE}}/${DATE}/g" "$f"
+      fi
+
+      sync_content_js "${PROJ_DIR}/technical-design.md"
+      success "  → .projector/ creado en ${REPO_NAME}"
+    else
+      log "  → .projector/ ya existe en ${REPO_NAME}"
+    fi
+
+    # Symlink into projects/
+    local LINK="${HUB_PATH}/projects/${REPO_NAME}"
+    if [ ! -e "$LINK" ]; then
+      ln -s "${PROJ_DIR}" "$LINK"
+    fi
+
+    # Add to metadata if not present
+    if command -v python3 &> /dev/null; then
+      python3 - "$META" "$REPO_NAME" "$DESC" "$DATE" << 'PYEOF'
+import json, re, sys
+meta_path, name, desc, date = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+with open(meta_path, 'r') as f: content = f.read()
+match = re.search(r'window\.__PROJECTOR_META\s*=\s*({.*});', content, re.DOTALL)
+if match:
+    data = json.loads(match.group(1))
+    if not any(p['name'] == name for p in data['projects']):
+        data['projects'].append({'name': name, 'description': desc, 'status': 'active', 'created': date, 'phase': 0, 'phases': 9})
+        with open(meta_path, 'w') as f:
+            f.write('window.__PROJECTOR_META = ' + json.dumps(data, indent=2, ensure_ascii=False) + ';\n')
+PYEOF
+    fi
+
+    COUNT=$((COUNT + 1))
+  done
+
+  success "${COUNT} proyectos registrados en el hub '${HUB_NAME}'"
+  echo ""
+  echo -e "  ${BOLD}Abrir dashboard:${NC}  ${CYAN}python3 -m http.server 8765 --directory ${HUB_PATH}${NC}"
+  echo -e "  ${BOLD}Luego abrir:${NC}      ${CYAN}http://localhost:8765${NC}"
+  echo ""
+}
+
 create_hub_project() {
   local ORG_NAME="$1"
   local PROJECT_NAME="$2"
@@ -465,6 +670,30 @@ case "${1:-}" in
     fi
     sync_content_js "$2"
     ;;
+  --link)
+    if [ -z "${2:-}" ] || [ -z "${3:-}" ]; then
+      error "Faltan argumentos"
+      echo ""
+      echo -e "  Uso: ${CYAN}bash init.sh --link <org> <ruta-al-repo> [descripción]${NC}"
+      echo ""
+      echo "Ejemplos:"
+      echo "  bash init.sh --link condolab-app ~/Projects/clusterflux"
+      echo "  bash init.sh --link condolab-app ~/Projects/clusterflux \"Plataforma de clusters\""
+      echo ""
+      exit 1
+    fi
+    link_existing_repo "$2" "$3" "${4:-}"
+    ;;
+  --scan)
+    if [ -z "${2:-}" ]; then
+      error "Debes especificar la ruta al directorio"
+      echo ""
+      echo -e "  Uso: ${CYAN}bash init.sh --scan <ruta/al/directorio>${NC}"
+      echo ""
+      exit 1
+    fi
+    scan_local_hub "$2"
+    ;;
   --standalone)
     init_standalone_core
     ;;
@@ -475,13 +704,17 @@ case "${1:-}" in
     echo "Uso:"
     echo "  bash init.sh                                  Setup guiado (interactivo)"
     echo "  bash init.sh --standalone                     Standalone (crea .projector/ aquí)"
-    echo "  bash init.sh --hub <org>                      Inicializa hub para una organización"
+    echo "  bash init.sh --hub <org>                      Inicializa hub (GitHub org)"
     echo "  bash init.sh --hub <org> <project> <desc>     Crea proyecto en el hub"
+    echo "  bash init.sh --scan <path>                    Escanea directorio local como hub"
+    echo "  bash init.sh --link <org> <path> [desc]       Vincula un repo al hub"
+    echo "  bash init.sh --sync <path/file.md>            Regenera content.js"
     echo ""
     echo "Ejemplos:"
     echo "  bash init.sh"
     echo "  bash init.sh --hub condolab-app"
-    echo "  bash init.sh --hub condolab-app mi-api \"API de autenticación\""
+    echo "  bash init.sh --scan ~/Projects/clusterflux"
+    echo "  bash init.sh --link condolab-app ~/Projects/my-repo"
     echo ""
     ;;
   *)

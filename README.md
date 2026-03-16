@@ -1,130 +1,174 @@
 # 📐 Projector
 
-**Documento técnico interactivo para diseño de software.**  
-Genera y gestiona documentos que siguen las 9 fases del SDLC, directo en tu navegador.
+**Visor Markdown interactivo para documentos técnicos de software.**  
+Genera y gestiona documentos SDLC de 9 fases — renderiza Markdown + Mermaid en el navegador con live-reload, comentarios y temas.
 
 <p align="center">
   <img src="https://img.shields.io/badge/Antigravity-Skill-6c5ce7?style=for-the-badge" alt="Antigravity Skill">
   <img src="https://img.shields.io/badge/SDLC-9_Fases-00b894?style=for-the-badge" alt="9 Fases SDLC">
-  <img src="https://img.shields.io/badge/Temas-3-ffa726?style=for-the-badge" alt="3 Temas">
+  <img src="https://img.shields.io/badge/Markdown-Source_of_Truth-0d1117?style=for-the-badge" alt="Markdown">
+  <img src="https://img.shields.io/badge/Mermaid-Diagrams-ff6b6b?style=for-the-badge" alt="Mermaid">
 </p>
 
 ---
 
-## 🚀 Instalación (un comando)
+## 🚀 Instalación
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/projector-ai/projector/main/install.sh | bash
 ```
 
-Esto instala el skill de Projector en tu directorio de Antigravity (`~/.gemini/antigravity/skills/software-design/`).
+Instala el skill en `~/.gemini/antigravity/skills/software-design/`.
 
-### Instalación manual
+<details>
+<summary>Instalación manual</summary>
+
 ```bash
 git clone https://github.com/projector-ai/projector.git
-cd projector
-bash install.sh
+cd projector && bash install.sh
 ```
+</details>
 
 ---
 
-## ⚡ Uso
+## ⚡ Uso rápido
 
-### Con Antigravity
+### Con Antigravity (agente)
 ```
 /software-design              → Documento para el proyecto actual
-/software-design hub           → Hub centralizado (multi-proyecto)
+/software-design hub          → Hub centralizado (multi-proyecto)
 ```
 
 ### Con terminal
 ```bash
-# Standalone: crea .projector/ en el directorio actual
-bash ~/.gemini/antigravity/skills/software-design/scripts/init.sh
+INIT="bash ~/.gemini/antigravity/skills/software-design/scripts/init.sh"
 
-# Hub: crea ~/projector-hub/ con dashboard
-bash ~/.gemini/antigravity/skills/software-design/scripts/init.sh --hub
+# Standalone: crea .projector/ en el directorio actual
+$INIT --standalone
+
+# Hub: crea hub para una organización GitHub
+$INIT --hub mi-org
+
+# Crear proyecto dentro del hub
+$INIT --hub mi-org mi-api "API de autenticación"
+
+# Escanear directorio existente con repos
+$INIT --scan ~/Projects/clusterflux
+
+# Vincular un repo individual a un hub existente
+$INIT --link mi-org ~/Projects/mi-repo "Mi proyecto"
+
+# Regenerar content.js después de editar el .md
+$INIT --sync ~/Projects/mi-org/projects/mi-api/technical-design.md
 ```
 
 ---
 
-## 🏗️ Modos de Uso
+## 🏗️ Arquitectura
+
+```
+.md es la fuente de verdad → viewer.html lo renderiza en el browser
+```
+
+### Archivos por proyecto
+
+```
+proyecto/
+├── .projector/
+│   ├── technical-design.md   ← Fuente de verdad (Markdown)
+│   ├── content.js            ← Generado automáticamente desde el .md
+│   └── index.html            ← Visor (marked.js + mermaid.js)
+```
+
+- **`technical-design.md`** — se pushea a GitHub/GitLab, se renderiza nativamente allí también
+- **`content.js`** — puente para CORS (carga el .md como JS template literal)
+- **`index.html`** — visor universal que renderiza Markdown + Mermaid
+
+---
+
+## 🏢 Modos de Uso
 
 ### Standalone (un proyecto)
-Crea `.projector/technical-design.html` dentro de tu proyecto.
+```bash
+$INIT --standalone
+```
+Crea `.projector/` dentro de tu proyecto actual.
+
+### Hub — Organización GitHub
+```bash
+$INIT --hub condolab-app                          # Crea hub
+$INIT --hub condolab-app condo-system "Sistema"   # Agrega proyecto
+```
 
 ```
-mi-proyecto/
-├── src/
-├── .projector/
-│   └── technical-design.html    ← Tu documento técnico
-└── ...
-```
-
-### Hub (multi-proyecto, tipo GitHub)
-Un dashboard central que gestiona múltiples proyectos de diseño.
-
-```
-~/projector-hub/
+~/Projects/condolab-app/
 ├── index.html                   ← Dashboard
+├── metadata.js                  ← Datos de proyectos
 └── projects/
-    ├── app-movil/
-    │   └── technical-design.html
-    ├── api-gateway/
-    │   └── technical-design.html
-    └── ...
+    └── condo-system/
+        ├── technical-design.md
+        ├── content.js
+        └── index.html
+```
+
+### Scan — Directorio local con repos existentes
+```bash
+$INIT --scan ~/Projects/clusterflux
+```
+
+Escanea subdirectorios con `.git` y crea `.projector/` dentro de cada uno:
+
+```
+~/Projects/clusterflux/
+├── index.html                   ← Dashboard (generado)
+├── metadata.js
+├── projects/                    ← Symlinks
+│   ├── vloft-api → ../vloft-api/.projector
+│   ├── vloft-core → ../vloft-core/.projector
+│   └── vloft-ui → ../vloft-ui/.projector
+├── vloft-api/
+│   ├── src/
+│   └── .projector/              ← Documentos técnicos
+│       ├── technical-design.md
+│       ├── content.js
+│       └── index.html
+├── vloft-core/
+└── vloft-ui/
 ```
 
 ---
 
-## 🏢 Inicializar una Organización
+## 🖥️ Visor en el navegador
 
-Si tienes múltiples equipos o proyectos, puedes usar Projector como hub centralizado para toda la organización:
+Para visualizar los documentos con live-reload:
 
-### 1. Crear el hub de la organización
 ```bash
-# Crea el hub en un directorio compartido o repositorio
-bash ~/.gemini/antigravity/skills/software-design/scripts/init.sh --hub ~/mi-org-hub
+# Levantar servidor local
+python3 -m http.server 8765 --directory ~/Projects/clusterflux
+
+# Abrir dashboard
+open http://localhost:8765
+
+# Abrir proyecto específico
+open http://localhost:8765/projects/vloft-api/index.html
 ```
 
-### 2. Agregar proyectos
-```bash
-# Cada proyecto se crea como subdirectorio
-bash ~/.gemini/antigravity/skills/software-design/scripts/init.sh --hub ~/mi-org-hub "proyecto-alpha" "Sistema de autenticación OAuth2"
-bash ~/.gemini/antigravity/skills/software-design/scripts/init.sh --hub ~/mi-org-hub "proyecto-beta" "API Gateway para microservicios"
-```
+### Funcionalidades del visor
 
-### 3. Abrir el dashboard
-```bash
-open ~/mi-org-hub/index.html
-```
-
-### 4. Flujo de trabajo por proyecto
-```
-# Desde Antigravity, en cualquier workspace
-/software-design hub
-
-# El agente te preguntará nombre y descripción
-# y creará el proyecto en el hub
-```
-
-### Estructura resultante
-```
-mi-org-hub/
-├── index.html                              ← Dashboard de la organización
-└── projects/
-    ├── proyecto-alpha/
-    │   └── technical-design.html            ← Documento completo
-    ├── proyecto-beta/
-    │   └── technical-design.html
-    └── proyecto-gamma/
-        └── technical-design.html
-```
-
-> **Tip:** Versiona el hub con Git para mantener el historial de cambios en tus documentos técnicos.
+| Feature | Detalle |
+|---------|---------|
+| 📝 **Markdown** | Renderizado con marked.js (GFM, tablas, blockquotes) |
+| 📊 **Mermaid** | Diagramas: flujo, secuencia, ER, Gantt, arquitectura |
+| ⛶ **Fullscreen** | Hover sobre diagrama → botón de pantalla completa |
+| 💬 **Comentarios** | Selecciona texto → clic derecho → agregar comentario |
+| 🔴 **Live reload** | Auto-actualiza cada 2s cuando el agente edita el .md |
+| 🎨 **3 Temas** | ☀️ Claro · 🌙 Oscuro · 🌿 Suave |
+| 📌 **Sidebar** | Navegación auto-generada desde headings H2 |
+| 📈 **Progreso** | Tracking de fases completadas via marcadores `PHASE` |
 
 ---
 
-## 📄 Fases del Documento
+## 📄 Fases del Documento SDLC
 
 | # | Fase | Descripción |
 |---|------|-------------|
@@ -140,17 +184,26 @@ mi-org-hub/
 
 ---
 
-## ✨ Características
+## 🔄 Flujo de trabajo con Antigravity
 
-| Feature | Detalle |
-|---------|---------|
-| 🎨 **3 Temas** | ☀️ Claro · 🌙 Oscuro · 🌿 Suave (eye comfort) |
-| ➕ **Bloques Jupyter** | Texto, Texto IA, Diagrama Mermaid, Tabla, Código |
-| ✏️ **Edición inline** | Doble clic para editar cualquier bloque |
-| 📋 **Menú contextual** | Clic derecho → Editar, Copiar, Comentar, Solicitar Cambio |
-| 💬 **Comentarios IA** | Feedback embebido que el agente lee y actúa |
-| 🔍 **Zoom** | Global + por diagrama + Ctrl+scroll |
-| 📊 **Diagramas** | Mermaid: flujo, secuencia, ER, Gantt, etc. |
+```mermaid
+graph LR
+    A[/software-design] --> B[Agente edita .md]
+    B --> C[Visor detecta cambio]
+    C --> D[Re-renderiza Markdown + Mermaid]
+    D --> E[Usuario revisa en browser]
+    E --> F{¿Ajustar?}
+    F -->|Sí| G[Comentario o instrucción]
+    G --> B
+    F -->|No| H[Siguiente fase]
+    H --> B
+```
+
+1. El usuario ejecuta `/software-design`
+2. El agente edita `technical-design.md` fase por fase
+3. El visor se actualiza automáticamente (live-reload)
+4. El usuario comenta o aprueba desde el browser
+5. Al completar las 9 fases, el `.md` se pushea al repo
 
 ---
 
@@ -158,17 +211,19 @@ mi-org-hub/
 
 ```
 projector/
-├── README.md                    ← Este archivo
-├── install.sh                   ← Instalador de un comando
+├── README.md
+├── install.sh                   ← Instalador
+├── .env.example                 ← Variables de entorno
 └── skill/
     ├── SKILL.md                 ← Instrucciones para el agente
     ├── templates/
-    │   ├── technical-design.html ← Template del documento técnico
-    │   └── dashboard.html        ← Template del dashboard (hub)
+    │   ├── technical-design.md  ← Template Markdown (9 fases SDLC)
+    │   ├── viewer.html          ← Visor (marked.js + mermaid.js)
+    │   └── dashboard.html       ← Dashboard (hub mode)
     ├── scripts/
-    │   └── init.sh               ← Script de bootstrapping
+    │   └── init.sh              ← Bootstrapping + sync + scan
     └── workflows/
-        └── software-design.md    ← Workflow de Antigravity
+        └── software-design.md   ← Workflow de Antigravity
 ```
 
 ---

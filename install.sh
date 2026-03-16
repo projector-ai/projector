@@ -52,13 +52,21 @@ git clone --quiet --depth 1 "${REPO_URL}" "${TMP_DIR}" 2>/dev/null || {
 # ── Install skill ──
 log "Instalando skill en ${CYAN}${SKILL_DIR}${NC}"
 
-mkdir -p "${SKILL_DIR}/templates" "${SKILL_DIR}/scripts"
+mkdir -p "${SKILL_DIR}/templates" "${SKILL_DIR}/scripts" "${SKILL_DIR}/workflows"
 
 cp "${TMP_DIR}/skill/SKILL.md"                          "${SKILL_DIR}/SKILL.md"
-cp "${TMP_DIR}/skill/templates/technical-design.html"    "${SKILL_DIR}/templates/technical-design.html"
 cp "${TMP_DIR}/skill/templates/dashboard.html"           "${SKILL_DIR}/templates/dashboard.html"
 cp "${TMP_DIR}/skill/scripts/init.sh"                    "${SKILL_DIR}/scripts/init.sh"
 chmod +x "${SKILL_DIR}/scripts/init.sh"
+
+# New Markdown-first templates
+[ -f "${TMP_DIR}/skill/templates/viewer.html" ]          && cp "${TMP_DIR}/skill/templates/viewer.html"          "${SKILL_DIR}/templates/viewer.html"
+[ -f "${TMP_DIR}/skill/templates/technical-design.md" ]  && cp "${TMP_DIR}/skill/templates/technical-design.md"  "${SKILL_DIR}/templates/technical-design.md"
+# Legacy HTML template (backwards compat)
+[ -f "${TMP_DIR}/skill/templates/technical-design.html" ] && cp "${TMP_DIR}/skill/templates/technical-design.html" "${SKILL_DIR}/templates/technical-design.html"
+
+# Workflow
+cp "${TMP_DIR}/skill/workflows/software-design.md"       "${SKILL_DIR}/workflows/software-design.md"
 
 success "Skill instalado"
 

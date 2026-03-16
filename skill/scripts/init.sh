@@ -523,31 +523,39 @@ METAEOF
     success "Dashboard + metadata creados"
   fi
 
-  # Scan for repos (directories with .git)
+  # Scan for repos — check both top-level and projects/ subdirectory
   local COUNT=0
-  for dir in "${HUB_PATH}"/*/; do
-    [ ! -d "$dir" ] && continue
+
+  _init_repo_in_scan() {
+    local dir="$1"
+    local HUB_PATH="$2"
+    local META="$3"
+    local DATE="$4"
+    local IS_IN_PROJECTS="$5"  # "yes" if already inside projects/
+
+    [ ! -d "$dir" ] && return
     local REPO_NAME=$(basename "$dir")
-    # Skip projector internal dirs
-    [ "$REPO_NAME" = "projects" ] && continue
-    [ "$REPO_NAME" = ".projector" ] && continue
+    # Skip internal dirs
+    [ "$REPO_NAME" = "projects" ] && return
+    [ "$REPO_NAME" = ".projector" ] && return
+    [ "$REPO_NAME" = ".agents" ] && return
 
     # Check if it's a repo (has .git or has source files)
-    if [ ! -d "${dir}.git" ] && [ ! -f "${dir}package.json" ] && [ ! -f "${dir}go.mod" ] && [ ! -f "${dir}Cargo.toml" ]; then
-      continue
+    if [ ! -d "${dir}/.git" ] && [ ! -f "${dir}/package.json" ] && [ ! -f "${dir}/go.mod" ] && [ ! -f "${dir}/Cargo.toml" ]; then
+      return
     fi
 
     log "Encontrado: ${CYAN}${REPO_NAME}${NC}"
 
     # Get description from git or default
     local DESC=""
-    if [ -d "${dir}.git" ]; then
+    if [ -d "${dir}/.git" ]; then
       DESC=$(cd "$dir" && git remote get-url origin 2>/dev/null | sed 's|.*/||;s|\.git$||' || echo "")
     fi
     [ -z "$DESC" ] && DESC="Proyecto ${REPO_NAME}"
 
     # Create .projector inside repo
-    local PROJ_DIR="${dir}.projector"
+    local PROJ_DIR="${dir}/.projector"
     mkdir -p "$PROJ_DIR"
 
     if [ ! -f "${PROJ_DIR}/technical-design.md" ]; then
@@ -571,10 +579,23 @@ METAEOF
       log "  → .projector/ ya existe en ${REPO_NAME}"
     fi
 
-    # Symlink into projects/
-    local LINK="${HUB_PATH}/projects/${REPO_NAME}"
-    if [ ! -e "$LINK" ]; then
-      ln -s "${PROJ_DIR}" "$LINK"
+    # Install workflow (for /software-design command)
+    local WORKFLOW_DIR="${dir}/.agents/workflows"
+    if [ ! -f "${WORKFLOW_DIR}/software-design.md" ]; then
+      mkdir -p "$WORKFLOW_DIR"
+      local WF_SRC="${SKILL_DIR}/workflows/software-design.md"
+      if [ -f "$WF_SRC" ]; then
+        cp "$WF_SRC" "${WORKFLOW_DIR}/software-design.md"
+        success "  → workflow instalado en ${REPO_NAME}/.agents/"
+      fi
+    fi
+
+    # If repo is NOT inside projects/, create symlink
+    if [ "$IS_IN_PROJECTS" != "yes" ]; then
+      local LINK="${HUB_PATH}/projects/${REPO_NAME}"
+      if [ ! -e "$LINK" ]; then
+        ln -s "${PROJ_DIR}" "$LINK"
+      fi
     fi
 
     # Add to metadata if not present
@@ -594,7 +615,21 @@ PYEOF
     fi
 
     COUNT=$((COUNT + 1))
+  }
+
+  # Scan top-level directories
+  for dir in "${HUB_PATH}"/*/; do
+    local dname=$(basename "$dir")
+    [ "$dname" = "projects" ] && continue
+    _init_repo_in_scan "$dir" "$HUB_PATH" "$META" "$DATE" "no"
   done
+
+  # Scan inside projects/ if it exists
+  if [ -d "${HUB_PATH}/projects" ]; then
+    for dir in "${HUB_PATH}"/projects/*/; do
+      _init_repo_in_scan "$dir" "$HUB_PATH" "$META" "$DATE" "yes"
+    done
+  fi
 
   success "${COUNT} proyectos registrados en el hub '${HUB_NAME}'"
   echo ""
